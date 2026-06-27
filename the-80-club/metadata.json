@@ -1,0 +1,6 @@
+{
+  "name": "The 80 Club",
+  "description": "Gourmet cloud kitchen offering premium burgers, hand-tossed pastas, and refreshing drinks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
