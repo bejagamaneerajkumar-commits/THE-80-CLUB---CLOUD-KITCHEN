@@ -25,6 +25,8 @@ interface InquirySubmit {
 }
 
 export default function Contact() {
+  const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xrewlgnw';
+
   const [distance, setDistance] = useState<string>('');
   const [zoneResult, setZoneResult] = useState<{
     status: 'Free Delivery' | 'Standard' | 'Extended' | 'Out of Bounds';
@@ -42,6 +44,8 @@ export default function Contact() {
     message: '',
   });
   const [isSubmitSuccess, setIsSubmitSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [inquiryHistory, setInquiryHistory] = useState<InquirySubmit[]>([]);
 
   // Load submissions from localStorage on mount
@@ -109,9 +113,12 @@ export default function Contact() {
     }
   };
 
-  const handleInquirySubmit = (e: React.FormEvent) => {
+  const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) return;
+
+    setIsSubmitting(true);
+    setSubmitError('');
 
     const newInquiry: InquirySubmit = {
       id: Math.random().toString(36).substr(2, 9),
@@ -122,26 +129,58 @@ export default function Contact() {
       timestamp: new Date().toLocaleString(),
     };
 
-    const updated = [newInquiry, ...inquiryHistory];
-    setInquiryHistory(updated);
     try {
-      localStorage.setItem('the_80_club_inquiries', JSON.stringify(updated));
-    } catch (err) {
-      console.warn('Could not write to localStorage', err);
+      const response = await fetch(FORMSPREE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          Accept: 'application/json',
+        },
+        body: new URLSearchParams({
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message,
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Your inquiry could not be sent right now.');
+      }
+
+      const updated = [newInquiry, ...inquiryHistory];
+      setInquiryHistory(updated);
+      try {
+        localStorage.setItem('the_80_club_inquiries', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not write to localStorage', err);
+      }
+
+      setIsSubmitSuccess(true);
+      setFormData({
+        name: '',
+        email: '',
+        subject: 'Feedback',
+        message: '',
+      });
+
+      setTimeout(() => {
+        setIsSubmitSuccess(false);
+      }, 6000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Your inquiry could not be sent right now.';
+      setSubmitError(message);
+
+      const updated = [newInquiry, ...inquiryHistory];
+      setInquiryHistory(updated);
+      try {
+        localStorage.setItem('the_80_club_inquiries', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not write to localStorage', err);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitSuccess(true);
-    setFormData({
-      name: '',
-      email: '',
-      subject: 'Feedback',
-      message: '',
-    });
-
-    // Auto dismiss after 6 seconds
-    setTimeout(() => {
-      setIsSubmitSuccess(false);
-    }, 6000);
   };
 
   const handleDeleteInquiry = (id: string) => {
@@ -396,20 +435,21 @@ export default function Contact() {
                 {/* Submit Feedback */}
                 <div className="flex items-center justify-between gap-4 pt-2">
                   <span className="text-[10px] font-mono text-neutral-400 font-semibold">
-                    * Saved securely to local sandbox storage
+                    * Sent to Formspree and saved locally as backup
                   </span>
                   <button
                     type="submit"
-                    className="flex items-center gap-1.5 px-6 py-3.5 bg-[#FF5C00] hover:bg-[#FF5C00]/90 text-white font-black rounded-xl border-2 border-transparent text-xs sm:text-sm shadow-md cursor-pointer transition-all active:scale-[0.98]"
+                    disabled={isSubmitting}
+                    className="flex items-center gap-1.5 px-6 py-3.5 bg-[#FF5C00] hover:bg-[#FF5C00]/90 text-white font-black rounded-xl border-2 border-transparent text-xs sm:text-sm shadow-md cursor-pointer transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
                     id="contact-form-submit-btn"
                   >
-                    <span>Submit Inquiry</span>
+                    <span>{isSubmitting ? 'Sending...' : 'Submit Inquiry'}</span>
                     <Send className="h-4.5 w-4.5" />
                   </button>
                 </div>
               </form>
 
-              {/* Submit Success Panel notification */}
+              {/* Submit Feedback Panel notification */}
               <AnimatePresence>
                 {isSubmitSuccess && (
                   <motion.div
@@ -419,11 +459,25 @@ export default function Contact() {
                     className="mt-4 p-4 bg-emerald-50 text-emerald-800 border-2 border-[#1A1A1A] text-xs rounded-xl text-left"
                   >
                     <p className="font-black mb-1">
-                      📬 Inquiry Recorded Successfully!
+                      📬 Inquiry Sent Successfully!
                     </p>
                     <p className="text-neutral-700 font-bold">
-                      Thank you! Your suggestion has been cataloged. Our founding officer group (Neeraj, Manikanta, and Sathwik) will audit your message and get back to you immediately.
+                      Thank you! Your message has been sent through Formspree and saved locally for reference. Our team will get back to you shortly.
                     </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {submitError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-4 p-4 bg-red-50 text-red-700 border-2 border-red-300 text-xs rounded-xl text-left"
+                  >
+                    <p className="font-black mb-1">⚠️ Submission Issue</p>
+                    <p className="text-neutral-700 font-bold">{submitError}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
